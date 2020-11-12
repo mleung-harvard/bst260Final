@@ -69,9 +69,15 @@ shinyApp(
             df1 %>%
                 ggplot(aes(Date, value)) +
                 geom_point(color = "Blue") +
+                geom_vline(aes(xintercept = as.numeric(as.Date("2020-03-20"))), color = "red") +
+                annotate("text", x = as.Date("2020-03-27"), 
+                         y = 4, 
+                         size = 4, 
+                         angle = 90, 
+                         label = "COVID-19 Lockdown") +
                 {
-                    if(input$outcome == "Goal Difference") geom_line(aes(Date, mean_gd, group = period), color = "red") 
-                    else geom_line(aes(Date, mean_ppg, group = period), color = "red")
+                    if(input$outcome == "Goal Difference") geom_line(aes(Date, mean_gd, group = period), color = "black") 
+                    else geom_line(aes(Date, mean_ppg, group = period), color = "black")
                 } +
                 labs(x = "Date", y = sprintf(input$outcome), color = "Period") +
                 theme_bw() +
