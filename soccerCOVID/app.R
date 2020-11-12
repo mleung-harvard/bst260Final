@@ -70,7 +70,7 @@ shinyApp(
                 ggplot(aes(Date, value)) +
                 geom_point(color = "Blue") +
                 {
-                    if(df1$outcome == "Goal Difference") geom_line(aes(Date, mean_gd, group = period), color = "red") 
+                    if(input$outcome == "Goal Difference") geom_line(aes(Date, mean_gd, group = period), color = "red") 
                     else geom_line(aes(Date, mean_ppg, group = period), color = "red")
                 } +
                 labs(x = "Date", y = sprintf(input$outcome), color = "Period") +
