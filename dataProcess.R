@@ -89,3 +89,5 @@ scrape("https://www.soccerstats.com/results.asp?league=france_2020&pmtype=bydate
 # convert from wide to long
 all <- rbind(spain, england, germany, italy, france) %>%
   gather(outcome, value, c("goal_diff", "ppg"))
+
+write.csv(all, "dataTop5.csv")
