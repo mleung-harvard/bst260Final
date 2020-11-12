@@ -3,6 +3,7 @@ library(shiny)
 library(shinythemes)
 library(dplyr)
 library(ggplot2)
+library(ggthemes)
 
 df <- read.csv("https://raw.githubusercontent.com/mleung-harvard/bst260Final/main/dataTop5.csv", header=T) %>%
     mutate(Date = as.Date(Date),
@@ -17,7 +18,7 @@ confint(m1)[2,2]
 meanDiff <- function(outcome, period, df) {
     m1 <- lm(value ~ period, data = df)
     sprintf(
-        "Mean difference: %0.3f [95%% CI: %0.2f, %0.2f]\n pvalue: %0.3f",
+        "Mean difference: %0.3f [95%% CI: %0.2f, %0.2f]\n p-value: %0.3f",
         summary(m1)$coef[2,1], confint(m1)[2,1], confint(m1)[2,2], summary(m1)$coef[2,4]
     )
 }
@@ -27,14 +28,18 @@ shinyApp(
         
         # App title
         titlePanel("Soccer Home Advantage in the COVID-19 Era"),
+        
+        # App theme
         theme = shinytheme("lumen"),
         
-        # Create an app with 2 tabs
+        # Create 3 fluid rows
         fluidRow(
             sidebarLayout(
                 sidebarPanel(
                     # Add some text and a couple of hyper links before the slider for year
-                    p("Test"),
+                    p("Due to COVID-19, soccer fans are no longer allowed in stadiums. 
+                      We explore whether the lack of fans diminishes home advantage in the top 5 European leagues by comparing
+                      home advantage metrics pre- and post-lockdown."),
                     
                     # Add some space between the text above and animated
                     # slider bar below
@@ -86,7 +91,18 @@ shinyApp(
                        outcome %in% input$outcome) 
             df1 %>%
                 ggplot(aes(Date, value)) +
-                geom_point(color = "Blue") +
+                {
+                    if(input$league == "spain") 
+                        geom_point(color="blue")
+                    else if(input$league == "england") 
+                        geom_point(color="red")
+                    else if(input$league == "germany") 
+                        geom_point(color="green4")
+                    else if(input$league == "italy") 
+                        geom_point(color="purple")
+                    else
+                        geom_point(color="hotpink")
+                } +
                 geom_vline(aes(xintercept = as.numeric(as.Date("2020-03-20"))), color = "red") +
                 {
                     if(input$outcome == "Goal Difference") 
@@ -112,7 +128,7 @@ shinyApp(
                 labs(x = "Date", y = sprintf(input$outcome), color = "Period") +
                 theme_bw() +
                 theme(legend.position = "none")
-        })
+        }, height = 475)
         
         output$pvalue <- renderText({
             df3 <- df %>% 
