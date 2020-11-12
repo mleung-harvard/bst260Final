@@ -73,7 +73,7 @@ shinyApp(
             column(width = 12,
                    h4("Summary Statistics"),
                    verbatimTextOutput("pvalue")
-            
+                   
             )),
         fluidRow(
             column(width = 12,
@@ -124,7 +124,7 @@ shinyApp(
                     else 
                         geom_line(aes(Date, mean_ppg, group = period), color = "black")
                 } +
-
+                
                 labs(x = "Date", y = sprintf(input$outcome), color = "Period") +
                 theme_bw() +
                 theme(legend.position = "none")
