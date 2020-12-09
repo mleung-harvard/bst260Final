@@ -9,6 +9,19 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+```{r, include = FALSE}
+library(rvest)
+library(dplyr)
+library(stringr)
+library(tidyr)
+library(data.table)
+library(lubridate)
+library(shiny)
+library(shinythemes)
+library(RCurl)
+library(ggplot2)
+```
+
 
 ## Overview and Motivation 
 We watch football every week and one of the strangest sights this year is the lack of fans in the stadium due to COVID-19 during games. Typically, the team playing at home has the advantage, where part of this advantage stems from the presence of their fans. An empty stadium could potentially have a psychological impact on the players, which could subsequently affect their performance in games (e.g., the home team may be less motivated as they do not have their fans cheering them on, or, on the contrary, the away team may be less scared to attack as the perceived home advantage is no longer there without the fans). As avid football fans, we wonder whether the lack of fans diminishes the advantage of the home team. 
@@ -26,15 +39,304 @@ We aimed to analyze the extent to which the presence of fans contributes to home
 - Germany (Bundesliga)
 - France (Ligue 1)
 
-We conceptualized home advantage in two ways: 1) goal difference (GD), which is the goals for the home team minus the goals for the away team for each match, and 2) acknowledging that goals do not tell the complete story, points per game (PPG) for the home team, which is 3 points for a win, 1 point for a draw, and 0 for a loss. By comparing these metrics pre- and post-lockdown due to COVID-19 (presence/absence of fans), in these respective countries, we would be able to assess whether home advantage has changed or not. 
+We conceptualized home advantage in two ways: 1) **goal difference (GD)**, which is the goals for the home team minus the goals for the away team for each match, and 2) acknowledging that goals do not tell the complete story, **points per game (PPG)** for the home team, which is 3 points for a win, 1 point for a draw, and 0 for a loss. By comparing these metrics pre- and post-lockdown due to COVID-19 (presence/absence of fans), in these respective countries, we would be able to assess whether home advantage has changed or not. 
 
 ## Data
-We scraped [www.soccerstats.com](www.soccerstats.com) for the relevant data for the 5 leagues for the 2019/2020 and 2020/2021 (ongoing) seasons using R (“rvest” package):
+We scraped [www.soccerstats.com](www.soccerstats.com) for the relevant data for the 5 leagues for the 2019/2020 and 2020/2021 (ongoing) seasons using R. Here we show a portion of the data for the English Premiler League 2020/2021 season to illustrate what the data looks like:
+
+![](https://github.com/mleung-harvard/bst260Final/blob/main/soccerstats.PNG?raw=true){width=75%}
+
+## Analysis
+
+### Analysis 1: Web scrape and data process
+
+With the "rvest" packaged, we wrote a webscraping function that will not only scrape the relevant data, but also calculate the home advantage metrics, stratified by pre- and post-lockdown periods for each league. 
+
+```{r}
+scrape <- function(url1, url2, country, lockdown)
+{
+  ## url1: url for 2019 season
+  ## url2: url for 2020 season
+  ## country: country of league
+  ## lockdown: date of lockdown
+  
+  df1 <- read_html(url1) %>% 
+    html_nodes("table") %>%
+    .[[14]] %>%
+    html_table(fill=T) %>%
+    select(X1, X3, X2, X4) %>%
+    setNames(c("Date", "result", "local.team", "away.team")) %>%
+    mutate(season = 2019)
+  df2 <- read_html(url2) %>% 
+    html_nodes("table") %>%
+    .[[14]] %>%
+    html_table(fill=T) %>%
+    select(X1, X3, X2, X4) %>%
+    setNames(c("Date", "result", "local.team", "away.team")) %>%
+    mutate(season = 2020)
+  df <- df1 %>%
+    bind_rows(df2) %>%
+    mutate(league = quo_name(enquo(country)),
+           result = ifelse(str_detect(result, "pp.|:") == T, NA,
+                           ifelse(result == "", NA, result))) %>%
+    na.omit() %>%
+    mutate(total.goals = str_replace_all(result, " - ", ""),
+           local.goals = as.numeric(substr(total.goals, 1, 1)),
+           away.goals = as.numeric(substr(total.goals, 2, 2)),
+           goal_diff = local.goals - away.goals,
+           ppg = case_when(
+             local.goals > away.goals ~ 3,
+             local.goals == away.goals ~ 1,
+             local.goals < away.goals ~ 0),
+           date2 = parse_date_time(Date, orders = c("dm")),
+           month = strftime(date2, "%m"),
+           day = strftime(date2, "%d"),
+           year = case_when (
+             season == 2019 & month %in% c("08", "09", "10", "11", "12") ~ "2019",
+             season == 2020 ~ "2020",
+             TRUE ~ "2020"),
+           Date = ymd(paste(year, month, day, sep= '-')),
+           period = ifelse(Date <= as.Date(lockdown), 0, 1)) %>%
+    select(-c(total.goals, date2, month, day, year))
+  
+  avg <- df %>%
+    group_by(league, period) %>%
+    summarise(mean_gd = mean(goal_diff, na.rm = T), mean_ppg = mean(ppg, na.rm = T), .groups = 'drop') %>%
+    ungroup()
+  
+  df <- df %>%
+    left_join(avg, by = c("league", "period"))
+  
+  # return df to global environment
+  assign(deparse(substitute(country)), df, envir = .GlobalEnv)
+  
+}
+
+#################################################
+##### 2. Scrape and process soccerstats.com #####
+#################################################
+
+scrape("https://www.soccerstats.com/results.asp?league=spain_2020&pmtype=bydate", 
+       "https://www.soccerstats.com/results.asp?league=spain&pmtype=bydate", spain, "2020-03-09")
+scrape("https://www.soccerstats.com/results.asp?league=england_2020&pmtype=bydate", 
+       "https://www.soccerstats.com/results.asp?league=england&pmtype=bydate", england, "2020-03-09")
+scrape("https://www.soccerstats.com/results.asp?league=germany_2020&pmtype=bydate", 
+       "https://www.soccerstats.com/results.asp?league=germany&pmtype=bydate", germany, "2020-03-11")
+scrape("https://www.soccerstats.com/results.asp?league=italy_2020&pmtype=bydate", 
+       "https://www.soccerstats.com/results.asp?league=italy&pmtype=bydate", italy, "2020-03-09")
+scrape("https://www.soccerstats.com/results.asp?league=france_2020&pmtype=bydate", 
+       "https://www.soccerstats.com/results.asp?league=france&pmtype=bydate", france, "2020-03-08")
+
+# convert from wide to long
+all <- rbind(spain, england, germany, italy, france) %>%
+  gather(outcome, value, c("goal_diff", "ppg"))
+write.csv(all, "dataTop5.csv")
+```
+
+For each match, we extracted the names of the teams, the date the match was played (to determine whether it was pre- or post-COVID), whether they were playing at or home or away, and the number of goals scored by each team, which allowed us to calculate GD and PPG, as well as the league averages of these metrics. An example of the data is shown below
+
+```{r}
+head(all)
+```
 
 
+## Analysis 2: Shiny
+
+For both home advantage metrics, we conducted an interrupted time-series analysis, which examines the effect of the COVID-19 lockdown by comparing home advantage (conceptualized by GD and PPG) before and after lockdown. The results of these analyses are displayed under "Summary Statistics", where the "mean difference" statistic is the difference in home advantage metric from post-lockdown compared to pre-lockdown, where a negative value indicates that home advantage has diminished.
+
+Furthermore, for PPG specifically, we also calculated the chi-squared statistic, which can also be found under "Summary Statistics", where a p-value of less than 0.05 would indicate that there is evidence to suggest a difference in the distribution of wins, losses and draws for the home team, pre- and post-lockdown.
+
+To display these analyses, we created a shiny app. See the corresponding shiny app [here](https://raw.githubusercontent.com/mleung-harvard/bst260Final/main/soccerCOVID/app.R). There is an input to select which leagues to display, and also an input to select which home advantage metric (i.e., GD or PPG) to display. Furthermore, for the GD metric, we also included a points near click function, so that the user can see the teams and score for a given match.
+
+```{r}
+df <- read.csv("https://raw.githubusercontent.com/mleung-harvard/bst260Final/main/dataTop5.csv", header=T) %>%
+    mutate(Date = as.Date(Date),
+           league = as.character(league),
+           outcome = ifelse(outcome == "goal_diff", "Goal Difference", "Points per Game (Home)"),
+           period = factor(period,
+                           levels = c(0,1),
+                           labels = c("Pre-lockdown", "Post-lockdown")))
 
 
-For each match, we will extracted the names of the teams, the date the match was played (to determine whether it was pre- or post-COVID), whether they were playing at or home or away, and the number of goals scored by each team, which will allow us to calculate GD and PPGD.
+meanDiff <- function(outcome, period, df) {
+    m1 <- lm(value ~ period, data = df)
+    sprintf(
+        "Mean difference: %0.3f [95%% CI: %0.2f, %0.2f]\n p-value: %0.3f",
+        summary(m1)$coef[2,1], confint(m1)[2,1], confint(m1)[2,2], summary(m1)$coef[2,4]
+    )
+}
 
-## Exploratory Analysis
-## Final Analysis
+chisq <-  function(outcome, period, df) {
+    m1 <- lm(value ~ period, data = df)
+    chisq <- chisq.test(table(df$period, df$value))
+    sprintf(
+        "Chi-square: %0.3f \n p-value: %0.3f\n\nMean difference: %0.3f [95%% CI: %0.2f, %0.2f]\n p-value: %0.3f",
+        chisq$statistic, chisq$p.value, summary(m1)$coef[2,1], confint(m1)[2,1], confint(m1)[2,2], summary(m1)$coef[2,4]
+    )
+}
+
+shinyApp(
+    ui = fluidPage(
+        
+        # App title
+        titlePanel("Soccer Home Advantage in the COVID-19 Era"),
+        
+        # App theme
+        theme = shinytheme("lumen"),
+        
+        # Create 3 fluid rows
+        fluidRow(
+            sidebarLayout(
+                sidebarPanel(
+                    # Add some text and a couple of hyper links before the slider for year
+                    p("Due to COVID-19, soccer fans are no longer allowed in stadiums. 
+                      We explore whether the lack of fans diminishes home advantage in the top 5 European leagues by comparing
+                      home advantage metrics pre- and post-lockdown."),
+                    
+                    # Add some space between the text above and animated
+                    # slider bar below
+                    br(),
+                    
+                    # Sidebar with a slider input for number of bins 
+                    radioButtons("league",
+                                 label = "Select League",
+                                 choices = list("Spain" = "spain",
+                                                "England" = "england",
+                                                "Germany" = "germany",
+                                                "Italy" = "italy",
+                                                "France" = "france"),
+                                 selected = "spain"),
+                    
+                    radioButtons("outcome",
+                                 "Home Advantage Metric",
+                                 choices = list("Goal Difference" = "Goal Difference", 
+                                                "Points per Game (Home)" = "Points per Game (Home)"),
+                                 selected = "Goal Difference")
+                ),
+                
+                # Show a plot of the generated distribution
+                mainPanel(
+                    plotOutput("Plot1",
+                               click = "plot_clicked")
+                    
+                )
+            )),
+        fluidRow(
+            column(width = 12,
+                   h4("Summary Statistics"),
+                   verbatimTextOutput("pvalue")
+                   
+            )),
+        fluidRow(
+            column(width = 12,
+                   h4("Points near click for Goal Difference"),
+                   verbatimTextOutput("click_info"))
+        )
+        
+    ),
+    
+    server = function(input, output) {
+        
+        output$Plot1 <- renderPlot({
+            df1 <- df %>% 
+                filter(league %in% input$league,
+                       outcome %in% input$outcome) 
+            df1 %>%
+                ggplot() +
+                # define the type of plot
+                {
+                    if(input$outcome == "Goal Difference")
+                    {
+                        if(input$league == "spain") 
+                            geom_point(aes(Date, value), color="blue")
+                        else if(input$league == "england") 
+                            geom_point(aes(Date, value), color="red")
+                        else if(input$league == "germany") 
+                            geom_point(aes(Date, value), color="green4")
+                        else if(input$league == "italy") 
+                            geom_point(aes(Date, value), color="purple")
+                        else
+                            geom_point(aes(Date, value), color="hotpink")
+                    }
+                    else
+                    {
+                        if(input$league == "spain") 
+                            geom_histogram(aes(as.factor(value)), stat = "count", fill="blue", alpha=0.7)
+                        else if(input$league == "england") 
+                            geom_histogram(aes(as.factor(value)), stat = "count", fill="red", alpha=0.7)
+                        else if(input$league == "germany") 
+                            geom_histogram(aes(as.factor(value)), stat = "count", fill="green4", alpha=0.7)
+                        else if(input$league == "italy") 
+                            geom_histogram(aes(as.factor(value)), stat = "count", fill="purple", alpha=0.7)
+                        else
+                            geom_histogram(aes(as.factor(value)), stat = "count", fill="hotpink", alpha=0.7)
+                    }
+                        
+                } +
+                # add vertical line for goal difference
+                {
+                    if(input$outcome == "Goal Difference")
+                        geom_vline(aes(xintercept = as.numeric(as.Date("2020-03-20"))), color = "red")
+                } +
+                # split into pre and post-lock down for histogram
+                {
+                    if(input$outcome == "Points per Game (Home)")
+                        facet_wrap(~period, nrow=1)
+                } +
+                # add annotation to vertical line
+                {
+                    if(input$outcome == "Goal Difference")
+                        annotate("text", x = as.Date("2020-03-27"), 
+                                 y = 4, 
+                                 size = 4, 
+                                 angle = 90, 
+                                 label = "COVID-19 Lockdown")
+                } +
+                # add mean lines
+                {
+                    if(input$outcome == "Goal Difference")
+                        geom_line(aes(Date, mean_gd, group = period), color = "black")
+                } +
+                # add labels
+                {
+                    if(input$outcome == "Goal Difference")
+                        labs(x = "Date", y = sprintf(input$outcome))
+                    else
+                        labs(x = sprintf(input$outcome), y = "Count")
+                } +
+                theme_bw() +
+                theme(legend.position = "none")
+        }, height = 475)
+        
+        output$pvalue <- renderText({
+            df3 <- df %>% 
+                filter(league %in% input$league,
+                       outcome %in% input$outcome) 
+            {
+                if(input$outcome == "Goal Difference")
+                    meanDiff(value, period, df3)
+                else
+                    chisq(value, period, df3)
+                }
+        })
+        
+        output$click_info <- renderPrint({
+            df2 <- df %>% 
+                filter(league %in% input$league,
+                       outcome %in% input$outcome) %>%
+                select(c(Date, result, local.team, away.team, league, outcome, value))
+            nearPoints(df2, input$plot_clicked)
+        })
+        
+    }
+)
+```
+
+## Conclusion
+
+In our analyses, we found that goal difference went down for four of the five top European Leagues, where the largest drop was for the Ligue 1 (France) with a mean reduction in GD of 0.357. For Italy, the goal difference increased only slightly (0.054 goals on average). However, none of the point estimates were statistically significant, although some were close, which does not rule out that there was no difference, but rather that there was not enough statistical power to detect a difference since there were fewer post-lockdown games compared to pre-lockdown games.
+
+Goal difference, however, does not tell the whole story, and so we also examined how the distribution of wins, losses and draws were altered after lockdown. In these analyses, we also looked at the mean difference in the point distribution for the home team (3 for a win, 1 for a draw, and 0 for a loss). We found that Spain, Germany and France had the largest reduction in points per game for the home team, all three above 0.2, with the p-values for Spain and Germany being significant. Visually examining that distribution from the histograms, we can see that Spain had a very large home advantage (3 points was the group with the largest count), but this advantage clearly decreased post-lockdown. We see something similar in Germany and France, where there were actually more losses than wins at home after lockdown in Germany. 
+
+Thus, to conclude, we can see that there is some evidence to suggest that the COVID-19 lockdown has affected certain leagues more than others. Looking at both home advantage metrics, we see that the lack of fans has diminished the home advantage for Spain, Germany and France. For the English and Italian leagues, the home advantage metrics appeared to be similar. However, with fewer games post-lockdown in our dataset there may be an issue with statistical power, where these analyses should be repeated after more matches have been played in the current season.
+
