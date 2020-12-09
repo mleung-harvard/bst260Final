@@ -9,9 +9,32 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+
 ## Overview and Motivation 
-## Related Work
-## Initial Questions
+We watch football every week and one of the strangest sights this year is the lack of fans in the stadium due to COVID-19 during games. Typically, the team playing at home has the advantage, where part of this advantage stems from the presence of their fans. An empty stadium could potentially have a psychological impact on the players, which could subsequently affect their performance in games (e.g., the home team may be less motivated as they do not have their fans cheering them on, or, on the contrary, the away team may be less scared to attack as the perceived home advantage is no longer there without the fans). As avid football fans, we wonder whether the lack of fans diminishes the advantage of the home team. 
+
+![Camp Nou Pre-lockdown](https://www.stadiumguide.com/wp-content/uploads/campnou_top.jpg){width=50%}
+
+![Camp Nou Post-lockdown](https://a.espncdn.com/combiner/i?img=%2Fphoto%2F2017%2F1001%2Fr267533_1296x729_16%2D9.jpg){width=50%}
+
+## Project Objectives
+We aimed to analyze the extent to which the presence of fans contributes to home advantage in the top 5 European leagues (which is determined by the UEFA Country Coefficients): 
+
+- Spain (La Liga)
+- England (Premier League)
+- Italy (Serie A)
+- Germany (Bundesliga)
+- France (Ligue 1)
+
+We conceptualized home advantage in two ways: 1) goal difference (GD), which is the goals for the home team minus the goals for the away team for each match, and 2) acknowledging that goals do not tell the complete story, points per game (PPG) for the home team, which is 3 points for a win, 1 point for a draw, and 0 for a loss. By comparing these metrics pre- and post-lockdown due to COVID-19 (presence/absence of fans), in these respective countries, we would be able to assess whether home advantage has changed or not. 
+
 ## Data
+We scraped [www.soccerstats.com](www.soccerstats.com) for the relevant data for the 5 leagues for the 2019/2020 and 2020/2021 (ongoing) seasons using R (“rvest” package):
+
+
+
+
+For each match, we will extracted the names of the teams, the date the match was played (to determine whether it was pre- or post-COVID), whether they were playing at or home or away, and the number of goals scored by each team, which will allow us to calculate GD and PPGD.
+
 ## Exploratory Analysis
 ## Final Analysis
