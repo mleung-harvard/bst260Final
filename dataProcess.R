@@ -21,14 +21,14 @@ scrape <- function(url1, url2, country, lockdown)
   
   df1 <- read_html(url1) %>% 
     html_nodes("table") %>%
-    .[[13]] %>%
+    .[[14]] %>%
     html_table(fill=T) %>%
     select(X1, X3, X2, X4) %>%
     setNames(c("Date", "result", "local.team", "away.team")) %>%
     mutate(season = 2019)
   df2 <- read_html(url2) %>% 
     html_nodes("table") %>%
-    .[[13]] %>%
+    .[[14]] %>%
     html_table(fill=T) %>%
     select(X1, X3, X2, X4) %>%
     setNames(c("Date", "result", "local.team", "away.team")) %>%
