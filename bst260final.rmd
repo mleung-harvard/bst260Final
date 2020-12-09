@@ -1,0 +1,17 @@
+---
+title: "Soccer Home Advantage in the COVID-19 Era"
+author: "Michael Leung and Alejandro Szmulewicz"
+date: "12/9/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview and Motivation 
+## Related Work
+## Initial Questions
+## Data
+## Exploratory Analysis
+## Final Analysis
