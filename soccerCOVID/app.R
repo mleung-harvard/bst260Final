@@ -5,14 +5,14 @@ library(dplyr)
 library(ggplot2)
 library(ggthemes)
 
+
 df <- read.csv("https://raw.githubusercontent.com/mleung-harvard/bst260Final/main/dataTop5.csv", header=T) %>%
     mutate(Date = as.Date(Date),
            league = as.character(league),
-           outcome = ifelse(outcome == "goal_diff", "Goal Difference", "Points per Game (Home)")) 
-
-m1 <- lm(value ~ period, data = df)
-
-confint(m1)[2,2]
+           outcome = ifelse(outcome == "goal_diff", "Goal Difference", "Points per Game (Home)"),
+           period = factor(period,
+                           levels = c(0,1),
+                           labels = c("Pre-lockdown", "Post-lockdown")))
 
 
 meanDiff <- function(outcome, period, df) {
@@ -20,6 +20,15 @@ meanDiff <- function(outcome, period, df) {
     sprintf(
         "Mean difference: %0.3f [95%% CI: %0.2f, %0.2f]\n p-value: %0.3f",
         summary(m1)$coef[2,1], confint(m1)[2,1], confint(m1)[2,2], summary(m1)$coef[2,4]
+    )
+}
+
+chisq <-  function(outcome, period, df) {
+    m1 <- lm(value ~ period, data = df)
+    chisq <- chisq.test(table(df$period, df$value))
+    sprintf(
+        "Chi-square: %0.3f \n p-value: %0.3f\n\nMean difference: %0.3f [95%% CI: %0.2f, %0.2f]\n p-value: %0.3f",
+        chisq$statistic, chisq$p.value, summary(m1)$coef[2,1], confint(m1)[2,1], confint(m1)[2,2], summary(m1)$coef[2,4]
     )
 }
 
@@ -77,7 +86,7 @@ shinyApp(
             )),
         fluidRow(
             column(width = 12,
-                   h4("Points near click"),
+                   h4("Points near click for Goal Difference"),
                    verbatimTextOutput("click_info"))
         )
         
@@ -90,42 +99,68 @@ shinyApp(
                 filter(league %in% input$league,
                        outcome %in% input$outcome) 
             df1 %>%
-                ggplot(aes(Date, value)) +
+                ggplot() +
+                # define the type of plot
                 {
-                    if(input$league == "spain") 
-                        geom_point(color="blue")
-                    else if(input$league == "england") 
-                        geom_point(color="red")
-                    else if(input$league == "germany") 
-                        geom_point(color="green4")
-                    else if(input$league == "italy") 
-                        geom_point(color="purple")
+                    if(input$outcome == "Goal Difference")
+                    {
+                        if(input$league == "spain") 
+                            geom_point(aes(Date, value), color="blue")
+                        else if(input$league == "england") 
+                            geom_point(aes(Date, value), color="red")
+                        else if(input$league == "germany") 
+                            geom_point(aes(Date, value), color="green4")
+                        else if(input$league == "italy") 
+                            geom_point(aes(Date, value), color="purple")
+                        else
+                            geom_point(aes(Date, value), color="hotpink")
+                    }
                     else
-                        geom_point(color="hotpink")
+                    {
+                        if(input$league == "spain") 
+                            geom_histogram(aes(as.factor(value)), stat = "count", fill="blue", alpha=0.7)
+                        else if(input$league == "england") 
+                            geom_histogram(aes(as.factor(value)), stat = "count", fill="red", alpha=0.7)
+                        else if(input$league == "germany") 
+                            geom_histogram(aes(as.factor(value)), stat = "count", fill="green4", alpha=0.7)
+                        else if(input$league == "italy") 
+                            geom_histogram(aes(as.factor(value)), stat = "count", fill="purple", alpha=0.7)
+                        else
+                            geom_histogram(aes(as.factor(value)), stat = "count", fill="hotpink", alpha=0.7)
+                    }
+                        
                 } +
-                geom_vline(aes(xintercept = as.numeric(as.Date("2020-03-20"))), color = "red") +
+                # add vertical line for goal difference
                 {
-                    if(input$outcome == "Goal Difference") 
+                    if(input$outcome == "Goal Difference")
+                        geom_vline(aes(xintercept = as.numeric(as.Date("2020-03-20"))), color = "red")
+                } +
+                # split into pre and post-lock down for histogram
+                {
+                    if(input$outcome == "Points per Game (Home)")
+                        facet_wrap(~period, nrow=1)
+                } +
+                # add annotation to vertical line
+                {
+                    if(input$outcome == "Goal Difference")
                         annotate("text", x = as.Date("2020-03-27"), 
                                  y = 4, 
                                  size = 4, 
                                  angle = 90, 
                                  label = "COVID-19 Lockdown")
-                    else
-                        annotate("text", x = as.Date("2020-03-27"), 
-                                 y = 2, 
-                                 size = 4, 
-                                 angle = 90, 
-                                 label = "COVID-19 Lockdown")
                 } +
+                # add mean lines
                 {
-                    if(input$outcome == "Goal Difference") 
-                        geom_line(aes(Date, mean_gd, group = period), color = "black") 
-                    else 
-                        geom_line(aes(Date, mean_ppg, group = period), color = "black")
+                    if(input$outcome == "Goal Difference")
+                        geom_line(aes(Date, mean_gd, group = period), color = "black")
                 } +
-                
-                labs(x = "Date", y = sprintf(input$outcome), color = "Period") +
+                # add labels
+                {
+                    if(input$outcome == "Goal Difference")
+                        labs(x = "Date", y = sprintf(input$outcome))
+                    else
+                        labs(x = sprintf(input$outcome), y = "Count")
+                } +
                 theme_bw() +
                 theme(legend.position = "none")
         }, height = 475)
@@ -134,7 +169,12 @@ shinyApp(
             df3 <- df %>% 
                 filter(league %in% input$league,
                        outcome %in% input$outcome) 
-            meanDiff(value, period, df3)
+            {
+                if(input$outcome == "Goal Difference")
+                    meanDiff(value, period, df3)
+                else
+                    chisq(value, period, df3)
+                }
         })
         
         output$click_info <- renderPrint({
