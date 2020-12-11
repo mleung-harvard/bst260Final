@@ -2,6 +2,7 @@
 
 Team: Michael Leung, Alejandro Szmulewicz
 
+
 **bst260Final.Rproj** is the R project file
 
 **bst260final.rmd** is the Rmarkdown for project
