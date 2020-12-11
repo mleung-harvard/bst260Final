@@ -46,14 +46,14 @@ scrape <- function(url1, url2, country, lockdown)
            ppg = case_when(
              local.goals > away.goals ~ 3,
              local.goals == away.goals ~ 1,
-             local.goals < away.goals ~ 0),
+             local.goals < away.goals ~ 0), # assigned 3 points to the locals if a win, 1 if a tie, 0 if a defeat
            date2 = parse_date_time(Date, orders = c("dm")),
            month = strftime(date2, "%m"),
            day = strftime(date2, "%d"),
            year = case_when (
              season == 2019 & month %in% c("08", "09", "10", "11", "12") ~ "2019",
              season == 2020 ~ "2020",
-             TRUE ~ "2020"),
+             TRUE ~ "2020"), # create season variable
            Date = ymd(paste(year, month, day, sep= '-')),
            period = ifelse(Date <= as.Date(lockdown), 0, 1)) %>%
     select(-c(total.goals, date2, month, day, year))
@@ -91,3 +91,4 @@ all <- rbind(spain, england, germany, italy, france) %>%
   gather(outcome, value, c("goal_diff", "ppg"))
 
 write.csv(all, "dataTop5.csv")
+

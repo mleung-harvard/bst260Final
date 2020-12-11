@@ -5,7 +5,8 @@ library(dplyr)
 library(ggplot2)
 library(ggthemes)
 
-
+# read cleaned data
+# create league variable, outcome measure, and a pre/post lockdown indicator
 df <- read.csv("https://raw.githubusercontent.com/mleung-harvard/bst260Final/main/dataTop5.csv", header=T) %>%
     mutate(Date = as.Date(Date),
            league = as.character(league),
@@ -163,7 +164,7 @@ shinyApp(
                 } +
                 theme_bw() +
                 theme(legend.position = "none")
-        }, height = 475)
+        })
         
         output$pvalue <- renderText({
             df3 <- df %>% 
